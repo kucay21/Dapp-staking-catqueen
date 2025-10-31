@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cat Queen Staking dApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <style>
+    body {
+      background: #0d0d0d;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      color: #ff6ec7;
+    }
+    button {
+      background: linear-gradient(90deg, #ff6ec7, #8e2de2);
+      border: none;
+      padding: 12px 25px;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 8px;
+      transition: 0.3s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    input {
+      padding: 10px;
+      width: 200px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+      text-align: center;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐾 Cat Queen Staking dApp</h1>
+  <button id="connectBtn">🔗 Connect Wallet</button>
+  <p id="wallet">Wallet: Not connected</p>
+
+  <h2>Stake Token</h2>
+  <input type="number" id="stakeAmount" placeholder="Amount to stake" />
+  <button id="stakeBtn">Stake</button>
+
+  <h2>Unstake Token</h2>
+  <input type="number" id="unstakeAmount" placeholder="Amount to unstake" />
+  <button id="unstakeBtn">Unstake</button>
+
+  <h2>Claim Rewards</h2>
+  <button id="claimBtn">Claim Rewards</button>
+
+  <div id="status"></div>
+
+  <script type="module">
+    const tokenAddress = "0x586f3cb4a16c8dbf6a62b599a73eca9cd0b945fe";
+    const stakingAddress = "0xef7d6880e7837D06bAa6090F8378592F3B4e174a";
+    const chainId = 8453;
+
+    const tokenABI = [
+      "function approve(address spender, uint256 amount) public returns (bool)",
+      "function allowance(address owner, address spender) public view returns (uint256)",
+      "function balanceOf(address owner) public view returns (uint256)",
+      "function decimals() public view returns (uint8)"
+    ];
+
+    const stakingABI = [
+      "function stake(uint256 _amount) public",
+      "function withdraw(uint256 _amount) public",
+      "function claimRewards() public",
+      "function getStakeInfo(address _staker) public view returns (uint256 _stakedAmount, uint256 _rewards)"
+    ];
+
+    let provider, signer, walletAddress;
+
+    const connectBtn = document.getElementById("connectBtn");
+    const walletText = document.getElementById("wallet");
+    const statusDiv = document.getElementById("status");
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("Metamask tidak ditemukan!");
+        return;
+      }
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      walletAddress = await signer.getAddress();
+      walletText.textContent = "Wallet: " + walletAddress;
+      statusDiv.textContent = "✅ Wallet terhubung ke Base Network";
+    }
+
+    connectBtn.addEventListener("click", connectWallet);
+
+    async function stakeTokens() {
+      try {
+        const amount = document.getElementById("stakeAmount").value;
+        const token = new ethers.Contract(tokenAddress, tokenABI, signer);
+        const staking = new ethers.Contract(stakingAddress, stakingABI, signer);
+        const decimals = await token.decimals();
+        const amountToStake = ethers.utils.parseUnits(amount, decimals);
+
+        statusDiv.textContent = "⏳ Approving token...";
+        const tx1 = await token.approve(stakingAddress, amountToStake);
+        await tx1.wait();
+
+        statusDiv.textContent = "⏳ Staking token...";
+        const tx2 = await staking.stake(amountToStake);
+        await tx2.wait();
+
+        statusDiv.textContent = "✅ Staking berhasil!";
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "❌ Gagal staking.";
+      }
+    }
+
+    async function unstakeTokens() {
+      try {
+        const amount = document.getElementById("unstakeAmount").value;
+        const staking = new ethers.Contract(stakingAddress, stakingABI, signer);
+        const token = new ethers.Contract(tokenAddress, tokenABI, signer);
+        const decimals = await token.decimals();
+        const amountToUnstake = ethers.utils.parseUnits(amount, decimals);
+
+        statusDiv.textContent = "⏳ Unstaking token...";
+        const tx = await staking.withdraw(amountToUnstake);
+        await tx.wait();
+
+        statusDiv.textContent = "✅ Unstake berhasil!";
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "❌ Gagal unstake.";
+      }
+    }
+
+    async function claimRewards() {
+      try {
+        const staking = new ethers.Contract(stakingAddress, stakingABI, signer);
+        statusDiv.textContent = "⏳ Mengklaim reward...";
+        const tx = await staking.claimRewards();
+        await tx.wait();
+        statusDiv.textContent = "✅ Reward berhasil diklaim!";
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "❌ Gagal klaim reward.";
+      }
+    }
+
+    document.getElementById("stakeBtn").addEventListener("click", stakeTokens);
+    document.getElementById("unstakeBtn").addEventListener("click", unstakeTokens);
+    document.getElementById("claimBtn").addEventListener("click", claimRewards);
+  </script>
+</body>
+</html>
